@@ -40,7 +40,7 @@ def run_processing():
         else:
             logging.warning(f"Arquivo {inf_path} não encontrado.")
             
-        logging.info("FASE 2 concluída com sucesso!")
+        logging.info("Concluído com sucesso!")
 
     except Exception as e:
         logging.critical(f"Erro durante o processamento de dados: {e}")
