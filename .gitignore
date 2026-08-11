@@ -1,0 +1,30 @@
+# Ambientes Virtuais Python
+venv/
+.venv/
+cvm-venv/
+ENV/
+env/
+
+# Dados (Apenas a estrutura de pastas é mantida, os arquivos de dados são ignorados)
+data/raw/*
+!data/raw/**/README.md
+!data/raw/**/.gitkeep
+data/processed/*
+!data/processed/**/README.md
+!data/processed/**/.gitkeep
+
+# Arquivos temporários e de Cache do Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Configurações do Sistema e IDEs
+.vscode/
+.idea/
+.DS_Store
+*.log
+
+# Segredos e Variáveis de Ambiente
+.env
+*.pem
