@@ -16,6 +16,11 @@ def clean_cadastro_fundos(filepath: str) -> pd.DataFrame:
     # Filtrar apenas fundos em funcionamento normal
     if "SIT" in df.columns:
         df = df[df["SIT"] == "EM FUNCIONAMENTO NORMAL"].copy()
+
+    if "SG_UF" not in df.columns:
+        df["SG_UF"] = "ND"
+    if "MUNICIPIO" not in df.columns:
+        df["MUNICIPIO"] = "NÃO INFORMADO"
         
     # Seleção de colunas estratégicas para o modelo dimensional
     cols_to_keep = [
@@ -23,7 +28,7 @@ def clean_cadastro_fundos(filepath: str) -> pd.DataFrame:
         "PUBLICO_ALVO", "ADMIN", "GESTOR", "SG_UF", "MUNICIPIO"
     ]
     existing_cols = [c for c in cols_to_keep if c in df.columns]
-    df = df[existing_cols]
+    df = df[existing_cols]  
     
     # Limpeza de nulos e duplicações por CNPJ
     df["CNPJ_FUNDO"] = df["CNPJ_FUNDO"].str.replace(r"\D", "", regex=True) # Apenas números
