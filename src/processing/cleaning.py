@@ -9,29 +9,38 @@ def clean_cadastro_fundos(filepath: str) -> pd.DataFrame:
     
     # Leitura com encoding latino
     df = pd.read_csv(filepath, sep=";", encoding="ISO-8859-1", dtype=str)
+    logging.info(f"Linhas lidas no CSV original: {len(df)}")
     
     # Remove caractere invisível BOM (\ufeff), espaços e padroniza para maiúsculo sem usar regex
     df.columns = df.columns.astype(str).str.lstrip('\ufeff').str.strip().str.upper()
-    
-    # Filtrar apenas fundos em funcionamento normal
-    if "SIT" in df.columns:
-        df = df[df["SIT"] == "EM FUNCIONAMENTO NORMAL"].copy()
 
     if "SG_UF" not in df.columns:
         df["SG_UF"] = "ND"
     if "MUNICIPIO" not in df.columns:
         df["MUNICIPIO"] = "NÃO INFORMADO"
-        
+
+    # Trata a coluna CLASSE garantindo que ela sempre exista e seja preenchida
+    if "CLASSE" not in df.columns:
+        df["CLASSE"] = df["TP_FUNDO"] if "TP_FUNDO" in df.columns else "NÃO INFORMADO"
+    else:
+        if "TP_FUNDO" in df.columns:
+            df["CLASSE"] = df["CLASSE"].fillna(df["TP_FUNDO"])
+            df["CLASSE"] = df["CLASSE"].replace(["", "ND", "NÃO INFORMADO", "NONE", "nan"], None)
+            df["CLASSE"] = df["CLASSE"].fillna(df["TP_FUNDO"])
+
     # Seleção de colunas estratégicas para o modelo dimensional
     cols_to_keep = [
         "CNPJ_FUNDO", "DENOM_SOCIAL", "CLASSE", "TP_FUNDO", 
         "PUBLICO_ALVO", "ADMIN", "GESTOR", "SG_UF", "MUNICIPIO"
     ]
     existing_cols = [c for c in cols_to_keep if c in df.columns]
-    df = df[existing_cols]  
-    
+    df = df[existing_cols].copy()
+
     # Limpeza de nulos e duplicações por CNPJ
-    df["CNPJ_FUNDO"] = df["CNPJ_FUNDO"].str.replace(r"\D", "", regex=True) # Apenas números
+    df["CNPJ_FUNDO"] = df["CNPJ_FUNDO"].astype(str).str.replace(r"\D", "", regex=True).str.zfill(14)
+
+    # Remove CNPJs inválidos ou zerados
+    df = df[(df["CNPJ_FUNDO"] != "00000000000000") & (df["CNPJ_FUNDO"].str.len() == 14)]
     df = df.drop_duplicates(subset=["CNPJ_FUNDO"])
     df = df.fillna("NÃO INFORMADO")
     
@@ -43,7 +52,7 @@ def clean_informe_diario(filepath: str) -> pd.DataFrame:
     """Limpa e padroniza o arquivo de Informes Diários (inf_diario_fi_202401.csv)."""
     logging.info("Iniciando limpeza do Informe Diário...")
     
-    df = pd.read_csv(filepath, sep=";", encoding="ISO-8859-1")
+    df = pd.read_csv(filepath, sep=";", encoding="ISO-8859-1", dtype=str)
     
     # Remove caractere invisível BOM (\ufeff), espaços e força caixa alta
     df.columns = df.columns.astype(str).str.lstrip('\ufeff').str.strip().str.upper()
@@ -62,26 +71,30 @@ def clean_informe_diario(filepath: str) -> pd.DataFrame:
     if missing:
         raise KeyError(f"Colunas essenciais {missing} não foram encontradas no Informe Diário. Colunas presentes: {list(df.columns)}")
 
-    # Seleção de colunas para a Tabela Fato
-    cols_fato = ["CNPJ_FUNDO", "DT_COMPTC", "VL_TOTAL", "VL_QUOTA", "VL_PATRIM_LIQ", "CAPTC_DIA", "RESG_DIA", "NR_COTST"]
-    df = df[[c for c in cols_fato if c in df.columns]].copy()
-    
     # Tratamento de tipos
-    df["CNPJ_FUNDO"] = df["CNPJ_FUNDO"].astype(str).str.replace(r"\D", "", regex=True)
+    df["CNPJ_FUNDO"] = df["CNPJ_FUNDO"].astype(str).str.replace(r"\D", "", regex=True).str.zfill(14)
     df["DT_COMPTC"] = pd.to_datetime(df["DT_COMPTC"], errors="coerce")
     
     # Conversão de colunas numéricas
     numeric_cols = ["VL_TOTAL", "VL_QUOTA", "VL_PATRIM_LIQ", "CAPTC_DIA", "RESG_DIA", "NR_COTST"]
     for col in numeric_cols:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+            df[col] = df[col].astype(str).str.replace(',', '.', regex=False)
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+        else:
+            df[col] = 0.0
             
     # Criação de métrica derivada: Captação Líquida Diária (Captação - Resgate)
     df["CAPT_LIQUIDA_DIA"] = df["CAPTC_DIA"] - df["RESG_DIA"]
+
+    # Seleção de colunas para a Tabela Fato
+    cols_fato = ["CNPJ_FUNDO", "DT_COMPTC", "VL_TOTAL", "VL_QUOTA", "VL_PATRIM_LIQ", "CAPTC_DIA", "RESG_DIA", "NR_COTST", "CAPT_LIQUIDA_DIA"]
+    df = df[[c for c in cols_fato if c in df.columns]].copy()
     
     # Remoção de registros inválidos (sem data ou sem CNPJ)
     df = df.dropna(subset=["CNPJ_FUNDO", "DT_COMPTC"])
+    df = df[(df["CNPJ_FUNDO"] != "00000000000000") & (df["CNPJ_FUNDO"].str.len() == 14)]
     df = df.drop_duplicates(subset=["CNPJ_FUNDO", "DT_COMPTC"])
     
     logging.info(f"Informe Diário limpo com sucesso. Registros diários: {len(df)}")
-    return df
+    return df   

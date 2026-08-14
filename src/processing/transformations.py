@@ -1,6 +1,8 @@
 import os
 import sys
 import logging
+import glob
+import pandas as pd
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
@@ -31,14 +33,22 @@ def run_processing():
             logging.warning(f"Arquivo {cad_path} não encontrado.")
             
         # Processamento do Informe Diário
-        if os.path.exists(inf_path):
-            df_inf = clean_informe_diario(inf_path)
+        inf_files = glob.glob(os.path.join(raw_dir, "inf_diario_fi_*.csv"))
+
+        if inf_files:
+            df_inf_list = []
+            for inf_path in inf_files:
+                    df_temp = clean_informe_diario(inf_path)
+                    df_inf_list.append(df_temp)
+
+            df_inf = pd.concat(df_inf_list, ignore_index=True)
+
             if validate_dataframe(df_inf, "Informe Diário", "CNPJ_FUNDO"):
                 output_inf = os.path.join(processed_dir, "inf_diario_processed.parquet")
                 df_inf.to_parquet(output_inf, index=False)
                 logging.info(f"Arquivo Parquet salvo em: {output_inf}")
         else:
-            logging.warning(f"Arquivo {inf_path} não encontrado.")
+           logging.warning("Nenhum arquivo 'inf_diario_fi_*.csv' foi encontrado na pasta raw.")
             
         logging.info("Concluído com sucesso!")
 

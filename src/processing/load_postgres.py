@@ -52,6 +52,10 @@ def load_data_to_postgres():
         "secret": os.getenv("AWS_SECRET_ACCESS_KEY"),
         "client_kwargs": {
             "region_name": os.getenv("AWS_REGION", "us-east-1")
+        },
+        "config_kwargs": {
+            "connect_timeout": 300,     
+            "read_timeout": 300
         }
     }
 
