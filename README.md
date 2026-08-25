@@ -105,7 +105,7 @@ cvm-business/
 
 ### 1. Clonar o repositório e preparar o ambiente
 ```bash
-git clone [https://github.com/lomaloma11/cvm-business.git](https://github.com/lomaloma11/cvm-business.git)
+git clone https://github.com/lomaloma11/cvm-business.git
 cd cvm-business
 
 python -m venv cvm-venv
