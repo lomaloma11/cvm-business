@@ -7,11 +7,13 @@ flowchart LR
         A1["Portal CVM<br>• cad_fi.csv<br>• inf_diario_fi.csv"]
     end
 
-    %% ETL Python
-    subgraph S2["2. Processamento (Python)"]
+    %% ETL & Validação Python
+    subgraph S2["2. Processamento & Data Quality (Python)"]
+        direction TB
         B1["cleaning.py<br>• Regex / Encoding<br>• Conversão Numérica"]
-        B2["transformations.py<br>• Formato Parquet"]
-        B1 --> B2
+        B2["validation.py<br>• Data Quality Gate<br>• Validação de Schema / PKs"]
+        B3["transformations.py<br>• Orquestração do Pipeline<br>• Exportação Parquet"]
+        B1 --> B2 --> B3
     end
 
     %% Data Lake
@@ -31,7 +33,7 @@ flowchart LR
 
     %% Conexões
     A1 -->|Leitura CSV| B1
-    B2 -->|upload_s3.py| C1
+    B3 -->|upload_s3.py| C1
     C1 -->|load_postgres.py| S4
 ```
 
