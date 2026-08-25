@@ -9,7 +9,7 @@ if current_dir not in sys.path:
     sys.path.append(current_dir)
 
 from cleaning import clean_cadastro_fundos, clean_informe_diario
-from validation import validate_dataframe
+from validation import validate_cadastro_fundos, validate_informe_diario
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -25,7 +25,8 @@ def run_processing():
         # Processamento do Cadastro
         if os.path.exists(cad_path):
             df_cad = clean_cadastro_fundos(cad_path)
-            if validate_dataframe(df_cad, "Cadastro Fundos", "CNPJ_FUNDO"):
+
+            if validate_cadastro_fundos(df_cad):
                 output_cad = os.path.join(processed_dir, "cad_fi_processed.parquet")
                 df_cad.to_parquet(output_cad, index=False)
                 logging.info(f"Arquivo Parquet salvo em: {output_cad}")
@@ -43,7 +44,7 @@ def run_processing():
 
             df_inf = pd.concat(df_inf_list, ignore_index=True)
 
-            if validate_dataframe(df_inf, "Informe Diário", "CNPJ_FUNDO"):
+            if validate_informe_diario(df_inf):
                 output_inf = os.path.join(processed_dir, "inf_diario_processed.parquet")
                 df_inf.to_parquet(output_inf, index=False)
                 logging.info(f"Arquivo Parquet salvo em: {output_inf}")

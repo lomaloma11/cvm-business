@@ -1,5 +1,6 @@
 import pandas as pd
 import logging
+import numpy as np
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -27,15 +28,19 @@ def clean_cadastro_fundos(filepath: str) -> pd.DataFrame:
             df["CLASSE"] = df["CLASSE"].fillna(df["TP_FUNDO"])
             df["CLASSE"] = df["CLASSE"].replace(["", "ND", "NÃO INFORMADO", "NONE", "nan"], None)
             df["CLASSE"] = df["CLASSE"].fillna(df["TP_FUNDO"])
+        df["CLASSE"] = df["CLASSE"].fillna("NÃO CLASSIFICADO")  
 
     # Seleção de colunas estratégicas para o modelo dimensional
     cols_to_keep = [
         "CNPJ_FUNDO", "DENOM_SOCIAL", "CLASSE", "TP_FUNDO", 
         "PUBLICO_ALVO", "ADMIN", "GESTOR", "SG_UF", "MUNICIPIO"
     ]
-    existing_cols = [c for c in cols_to_keep if c in df.columns]
-    df = df[existing_cols].copy()
+    df = df[[c for c in cols_to_keep if c in df.columns]].copy()
 
+    for col in ["PUBLICO_ALVO","SG_UF", "MUNICIPIO"]:
+        if col in df.columns:
+            df[col] = df[col].fillna("Não informado")
+    
     # Limpeza de nulos e duplicações por CNPJ
     df["CNPJ_FUNDO"] = df["CNPJ_FUNDO"].astype(str).str.replace(r"\D", "", regex=True).str.zfill(14)
 
@@ -43,6 +48,9 @@ def clean_cadastro_fundos(filepath: str) -> pd.DataFrame:
     df = df[(df["CNPJ_FUNDO"] != "00000000000000") & (df["CNPJ_FUNDO"].str.len() == 14)]
     df = df.drop_duplicates(subset=["CNPJ_FUNDO"])
     df = df.fillna("NÃO INFORMADO")
+
+    if df.empty:
+        raise ValueError("Cadastro de Fundos vazio após a limpeza.")
     
     logging.info(f"Cadastro limpo com sucesso. Registros ativos: {len(df)}")
     return df
@@ -75,26 +83,44 @@ def clean_informe_diario(filepath: str) -> pd.DataFrame:
     df["CNPJ_FUNDO"] = df["CNPJ_FUNDO"].astype(str).str.replace(r"\D", "", regex=True).str.zfill(14)
     df["DT_COMPTC"] = pd.to_datetime(df["DT_COMPTC"], errors="coerce")
     
-    # Conversão de colunas numéricas
-    numeric_cols = ["VL_TOTAL", "VL_QUOTA", "VL_PATRIM_LIQ", "CAPTC_DIA", "RESG_DIA", "NR_COTST"]
-    for col in numeric_cols:
+    # Metricas de estoque/preco
+    stock_cols = ["VL_TOTAL", "VL_QUOTA", "VL_PATRIM_LIQ"]
+    for col in stock_cols:
         if col in df.columns:
-            df[col] = df[col].astype(str).str.replace(',', '.', regex=False)
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+            df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce')
+        else:
+            df[col] = np.nan
+
+    # Metricas de fluxo
+    flow_cols = ["CAPTC_DIA", "RESG_DIA", "NR_COTST"]
+    for col in flow_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', '.'), errors='coerce').fillna(0.0)
         else:
             df[col] = 0.0
-            
+
+    # Remoção de nulos em chaves e métricas de estoque
+    df = df.dropna(subset=["CNPJ_FUNDO", "DT_COMPTC"] + stock_cols)
+
+    df = df[(df["VL_TOTAL"] > 0) & (df["VL_QUOTA"] > 0) & (df["VL_PATRIM_LIQ"] > 0)]
+    df = df[(df["CAPTC_DIA"] >= 0) & (df["RESG_DIA"] >= 0) & (df["NR_COTST"] >= 0)]
+    
     # Criação de métrica derivada: Captação Líquida Diária (Captação - Resgate)
     df["CAPT_LIQUIDA_DIA"] = df["CAPTC_DIA"] - df["RESG_DIA"]
 
     # Seleção de colunas para a Tabela Fato
-    cols_fato = ["CNPJ_FUNDO", "DT_COMPTC", "VL_TOTAL", "VL_QUOTA", "VL_PATRIM_LIQ", "CAPTC_DIA", "RESG_DIA", "NR_COTST", "CAPT_LIQUIDA_DIA"]
+    cols_fato = [
+        "CNPJ_FUNDO", "DT_COMPTC", "VL_TOTAL", "VL_QUOTA", "VL_PATRIM_LIQ", 
+        "CAPTC_DIA", "RESG_DIA", "NR_COTST", "CAPT_LIQUIDA_DIA"
+        ]
     df = df[[c for c in cols_fato if c in df.columns]].copy()
     
     # Remoção de registros inválidos (sem data ou sem CNPJ)
-    df = df.dropna(subset=["CNPJ_FUNDO", "DT_COMPTC"])
     df = df[(df["CNPJ_FUNDO"] != "00000000000000") & (df["CNPJ_FUNDO"].str.len() == 14)]
     df = df.drop_duplicates(subset=["CNPJ_FUNDO", "DT_COMPTC"])
+
+    if df.empty:
+        raise ValueError("Informe Diário ficou vazio após a limpeza.")
     
     logging.info(f"Informe Diário limpo com sucesso. Registros diários: {len(df)}")
     return df   
