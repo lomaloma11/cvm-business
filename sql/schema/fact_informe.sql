@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS fact_informe_diario (
     cnpj_fundo VARCHAR(14) NOT NULL,
     dt_comptc DATE NOT NULL,
     vl_total NUMERIC(18, 2),
-    vl_quota NUMERIC(18, 6),
+    vl_quota NUMERIC(25, 8),
     vl_patrim_liq NUMERIC(18, 2),
     captc_dia NUMERIC(18, 2),
     resg_dia NUMERIC(18, 2),

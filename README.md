@@ -130,6 +130,10 @@ DB_PASSWORD=sua_senha
 
 ### 3. Executar o Pipeline
 ```bash
+
+# 0. Rodar o script de download dos dados para fazer as etapas principais
+python src/ingestion/download_data.py
+
 # 1. Processa, limpa e valida os dados brutos (gera Parquets locais)
 python src/processing/transformations.py
 
